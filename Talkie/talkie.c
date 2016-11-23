@@ -2,15 +2,23 @@
 // Copyright 2011 Peter Knight
 // This code is released under GPLv2 license.
 
-#if (ARDUINO >= 100)
- #include "Arduino.h"
-#else
- #include <avr/io.h>
- #include "WProgram.h"
-#endif
 #include "talkie.h"
 
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
 #define FS 8000 // Speech engine sample rate
+
+#define _BV(bit) (1 << (bit))
+
+// Setup
+uint8_t setup;
+		
+// BitStream parser
+void setPtr(uint8_t* addr);
+uint8_t rev(uint8_t a);
+uint8_t getBits(uint8_t bits);
 
 uint8_t synthPeriod;
 uint16_t synthEnergy;
@@ -30,14 +38,14 @@ int8_t tmsK8[0x08]      = {0xC0,0xD8,0xF0,0x07,0x1F,0x37,0x4F,0x66};
 int8_t tmsK9[0x08]      = {0xC0,0xD4,0xE8,0xFC,0x10,0x25,0x39,0x4D};
 int8_t tmsK10[0x08]     = {0xCD,0xDF,0xF1,0x04,0x16,0x20,0x3B,0x4D};
 
-void Talkie::setPtr(uint8_t* addr) {
+void setPtr(uint8_t* addr) {
 	ptrAddr = addr;
 	ptrBit = 0;
 }
 
 // The ROMs used with the TI speech were serial, not byte wide.
 // Here's a handy routine to flip ROM data which is usually reversed.
-uint8_t Talkie::rev(uint8_t a) {
+uint8_t rev(uint8_t a) {
 	// 76543210
 	a = (a>>4) | (a<<4); // Swap in groups of 4
 	// 32107654
@@ -47,7 +55,8 @@ uint8_t Talkie::rev(uint8_t a) {
 	// 01234567
 	return a;
 }
-uint8_t Talkie::getBits(uint8_t bits) {
+
+uint8_t getBits(uint8_t bits) {
 	uint8_t value;
 	uint16_t data;
 	data = rev(pgm_read_byte(ptrAddr))<<8;
@@ -63,7 +72,7 @@ uint8_t Talkie::getBits(uint8_t bits) {
 	}
 	return value;
 }
-void Talkie::say(uint8_t* addr) {
+void say(uint8_t* addr) {
 	uint8_t energy;
 
 	if (!setup) {
@@ -71,7 +80,8 @@ void Talkie::say(uint8_t* addr) {
 		// 
 		// Enable the speech system whenever say() is called.
 		
-		pinMode(3,OUTPUT);
+		//pinMode(3,OUTPUT); //TODO: Reimplement
+
 		// Timer 2 set up as a 62500Hz PWM.
 		//
 		// The PWM 'buzz' is well above human hearing range and is
@@ -139,7 +149,7 @@ void Talkie::say(uint8_t* addr) {
 				}
 			}
 		}
-		delay(25);
+		_delay_ms(25);
 	} while (energy != 0xf);
 }
 
